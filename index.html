@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>企業綜合點餐平台</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        body { font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; background-color: #f8fafc; color: #1e293b; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade { animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useCallback } = React;
+
+        // --- 1. 系統常數與資料 ---
+        const SYSTEM_NAME = "企業綜合點餐平台";
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwAxzfi37h71pG5r3b1agb4ptTBvaLLHyMhYRPpg29cltv05VUyJIuIUH_myb4yaf8MnA/exec"; 
+
+        const employees = [
+            '柳奇宏', '力乃青', '董懿嫺', '李岱娟', '林鈺倖', '林炫均', '黃筱淇', '林家意', 
+            '蔡雙全', '吳建毅', '崔文沛', '涂有丞', '林澄洋', '崔顯亞', '湯暉恆', '顏志良', 
+            '洪寶清', '孟家榮', '吳國禎', '俞家雄', '黃琮群', '吳欣玫', '滿昱綸', '張嗣賢', 
+            '楊瑞銘', '黃瑞琳', '方宗尉', '蔡尚霖', '羅金祺', '王子銘', '劉建仁', '石玉嬋', 
+            '賴庭玉', '黃瑞勳', '楊正財', '林于盛', '薛年慶', '賴奕勳'
+        ];
+
+        const ICE_OPTIONS = ["正常冰", "少冰", "去冰"];
+        const SUGAR_OPTIONS = ["正常", "8分", "5分", "3分", "無糖"];
+
+        // --- 2. 靜態菜單數據 ---
+        const rawXiaoZhaWuMenu = { "咖哩系列": [{name:"巨無霸雙拼咖哩便當", price:280},{name:"日式炸蝦咖哩便當", price:160},{name:"炸豬排咖哩便當", price:130},{name:"唐揚雞咖哩便當", price:130}], "手作便當": [{name:"打拋豬便當", price:110},{name:"鹽蔥雞胸便當", price:110},{name:"香草鱈魚便當", price:120},{name:"壽喜燒牛五花便當", price:130},{name:"椒麻雞便當", price:140}] };
+        const rawBaFangMenu = { "鍋貼類": [{name:"招牌鍋貼",price:7},{name:"韭菜鍋貼",price:7},{name:"韓式辣味鍋貼",price:7},{name:"咖哩雞肉鍋貼",price:7},{name:"玉米鍋貼",price:7},{name:"新蔬食鍋貼",price:7.5}], "水餃類": [{name:"招牌水餃",price:7},{name:"韭菜水餃",price:7},{name:"韓式辣味水餃",price:7},{name:"咖哩雞肉水餃",price:7},{name:"玉米水餃",price:7},{name:"新蔬食水餃",price:7.5},{name:"鮮蝦水餃",price:10.5}], "麵食/抄手": [{name:"古早味乾麵",price:45},{name:"麻醬乾麵",price:55},{name:"招牌乾麵",price:55},{name:"紹辣乾麵",price:60},{name:"酸辣湯麵",price:70},{name:"珍珠餛飩麵",price:70},{name:"菜肉大餛飩麵",price:80},{name:"梁師傅排骨麵",price:105},{name:"珍珠抄手",price:60},{name:"菜肉大抄手",price:75}], "金牌牛肉麵": [{name:"紅燒牛肉麵",price:168},{name:"清燉牛肉麵",price:168},{name:"麻辣牛肉麵",price:178},{name:"紅燒牛湯餃",price:120},{name:"麻辣牛湯餃",price:125}], "湯品/飲品": [{name:"酸辣湯",price:35},{name:"玉米濃湯",price:35},{name:"旗魚花枝丸湯",price:35},{name:"珍珠餛飩湯",price:50},{name:"菜肉大餛飩湯",price:60},{name:"香濃豆漿",price:20},{name:"黑豆漿",price:20},{name:"特調紅茶",price:20}] };
+        const rawHuaChuanMenu = { "熱炒類": [{name:"合菜戴帽(附餅皮)",price:220},{name:"鳳梨蝦球",price:240},{name:"金沙中卷",price:240},{name:"京醬肉絲(附餅皮)",price:220},{name:"糖醋魚片",price:200},{name:"蔥爆牛肉",price:210},{name:"蔥爆豬肉",price:180},{name:"宮保雞丁",price:200},{name:"金沙豆腐",price:160},{name:"椒鹽杏鮑菇",price:150},{name:"蝦仁炒蛋",price:180},{name:"開陽白菜",price:150},{name:"鹹蛋苦瓜",price:150},{name:"紅燒家常豆腐",price:150},{name:"菜脯蛋",price:120},{name:"炒空心菜",price:80},{name:"炒高麗菜",price:100},{name:"水蓮",price:120},{name:"沙茶羊肉",price:180}], "飯/粥類": [{name:"排骨飯",price:100},{name:"沙茶牛肉炒飯",price:110},{name:"肉絲蛋炒飯",price:80},{name:"蝦仁蛋炒飯",price:90},{name:"鮭魚蛋炒飯",price:90},{name:"鳳梨炒飯",price:80},{name:"素食炒飯",price:80},{name:"豬肉燴飯",price:80},{name:"牛肉燴飯",price:110},{name:"羊肉燴飯",price:100},{name:"老鍋肉燥飯",price:50},{name:"小米粥",price:30},{name:"白飯",price:15}], "麵類": [{name:"牛肉炒麵",price:110},{name:"三鮮炒麵",price:100},{name:"木須肉炒麵",price:90},{name:"素食炒麵",price:80},{name:"牛肉炒貓耳朵",price:110},{name:"三鮮炒貓耳朵",price:100},{name:"木須肉炒貓耳朵",price:90},{name:"牛肉炒餅",price:130},{name:"三鮮炒餅",price:110},{name:"木須肉炒餅",price:100},{name:"牛半筋半肉麵",price:160},{name:"清燉牛肉麵",price:140},{name:"紅燒牛肉麵",price:140},{name:"大滷麵",price:100},{name:"餛飩湯麵",price:80},{name:"榨菜肉絲麵",price:80},{name:"酸辣麵",price:85},{name:"醡醬麵",price:75},{name:"麻醬麵",price:75},{name:"紅油抄手(單點)",price:70},{name:"肉燥乾麵",price:75}], "餃/包/餅類": [{name:"招牌水餃",price:7},{name:"韭菜盒",price:40},{name:"豬肉餡餅(顆)",price:50},{name:"牛肉餡餅(顆)",price:55},{name:"蔥油餅",price:60},{name:"(甜)烙餅",price:70},{name:"(鹹)烙餅",price:70},{name:"酸辣湯餃",price:90},{name:"牛肉湯餃",price:90},{name:"榨菜肉絲湯餃",price:90},{name:"花素蒸餃",price:100},{name:"蝦仁蒸餃",price:100},{name:"小籠湯包",price:100},{name:"生菜沙拉捲餅",price:90},{name:"豬肉捲餅",price:90},{name:"燻雞肉捲餅",price:90},{name:"牛肉捲餅",price:110},{name:"鍋貼",price:60},{name:"蛋黃流沙包",price:35},{name:"芝麻流沙包",price:35}], "湯類": [{name:"紫菜湯",price:25},{name:"酸辣湯",price:40},{name:"玉米濃湯",price:40},{name:"青菜豆腐湯",price:40},{name:"青菜蛋花湯",price:40},{name:"蛤蜊湯",price:50},{name:"苦瓜排骨湯",price:50}] };
+        const rawHanTingMenu = { "飯麵類": [{name:"韓式豬肉拌飯",price:90},{name:"韓式牛肉拌飯",price:100},{name:"韓式烤豬肉飯",price:90},{name:"韓式烤牛肉飯",price:100},{name:"泡菜豬肉丼飯",price:100},{name:"泡菜牛肉丼飯",price:110},{name:"起司辛拉麵",price:100},{name:"韓式炸醬麵",price:120},{name:"五花肉拌麵",price:120},{name:"手捏拳頭飯",price:80}], "豆腐煲": [{name:"韓式豬肉豆腐煲",price:150},{name:"韓式牛肉豆腐煲",price:160},{name:"韓式海鮮豆腐煲",price:180},{name:"泡菜豬肉豆腐煲",price:160},{name:"泡菜牛肉豆腐煲",price:170},{name:"牛奶豆腐煲",price:160},{name:"大醬豬肉鍋",price:150},{name:"大醬牛肉鍋",price:160},{name:"大醬海鮮鍋",price:180},{name:"部隊鍋",price:200}], "煎餅": [{name:"海鮮煎餅",price:90},{name:"牛肉煎餅",price:100},{name:"泡菜豬肉煎餅",price:100},{name:"糖餅",price:80}], "便當": [{name:"韓式炸雞便當",price:120},{name:"鹽烤五花肉便當",price:120},{name:"泡菜豬肉便當",price:120},{name:"泡菜牛肉便當",price:130},{name:"香煎鮭魚便當",price:135},{name:"薄鹽鯖魚便當",price:135},{name:"三色烤五花肉便當",price:200}], "炸物": [{name:"韓式炸雞",price:150},{name:"蜂蜜芥末炸雞",price:150},{name:"蒜香醬油炸雞",price:150},{name:"紫菜冬粉捲",price:120},{name:"咔滋吐司蝦",price:120},{name:"爆漿熔岩蝦球",price:120},{name:"黃金炸蟹鉗",price:130},{name:"炸牡蠣",price:180},{name:"紫蘇蝦餅",price:150},{name:"蝦多拿滋",price:220},{name:"米熱狗",price:100}] };
+        const rawMacuMenu = { "飲中甜品|季節限定": [{name:"芝芝可可",price:85},{name:"楊枝甘露2.0",price:80},{name:"芝芝芒果果粒",price:90},{name:"芒果果粒波波",price:80},{name:"芝芝葡萄果粒",price:85},{name:"葡萄果粒波波",price:85}], "芝芝系列": [{name:"芝芝金萱",price:50},{name:"芝芝錫蘭紅茶",price:50},{name:"芝芝翡翠綠茶",price:50},{name:"芝芝蜜桃紅茶",price:60}], "果粒茶系列": [{name:"香橙果粒茶",price:70},{name:"柳橙果粒茶",price:65},{name:"葡萄柚果粒茶",price:60}], "鮮果茶飲": [{name:"百香雙Q果",price:55},{name:"番茄梅蜜",price:60},{name:"翡翠柳橙",price:60}], "原味茶": [{name:"高山金萱茶",price:30},{name:"翡翠綠茶",price:30},{name:"錫蘭紅茶",price:30}] };
+        const rawWuLiangLiuMenu = { "主食": [{name:"牛燥飯",price:60},{name:"豬肉燥飯(小)",price:40},{name:"筍干豬腳丁飯",price:85},{name:"滷牛頰肉飯",price:85},{name:"牛燥乾麵",price:60}], "湯品": [{name:"牛肉湯(小)",price:60},{name:"牛肉湯(大)",price:100},{name:"牛雜湯",price:120},{name:"蒜頭蛤蜊湯",price:60}], "滷味小品": [{name:"滷味切盤",price:80},{name:"滷肥腸",price:60},{name:"豬耳朵",price:40},{name:"滷蛋",price:15}] };
+        const rawYiKouRuHunMenu = { "湯品類": [{name:"鮮肉餛飩湯",price:85},{name:"蝦仁餛飩湯",price:110},{name:"剝皮辣椒餛飩湯",price:110}], "麵食類": [{name:"鮮肉餛飩麵(湯)",price:100},{name:"鮮肉餛飩麵(乾)",price:100},{name:"蝦仁餛飩麵(湯)",price:120}], "抄手系列": [{name:"紅油抄手(鮮肉)",price:85},{name:"紅油抄手(蝦仁)",price:110}] };
+        const rawZhuoShangBinMenu = { "經典便當": [{name:"三拼飯",price:140},{name:"雞排飯",price:120},{name:"雞腿飯",price:125},{name:"排骨飯",price:105},{name:"鯖魚飯",price:120},{name:"鮭魚飯",price:135}], "雙拼系列": [{name:"雙拼A(雞腿+排骨)",price:115},{name:"雙拼B(雞腿+魚排)",price:115}], "單加點": [{name:"飯菜",price:60},{name:"肉燥飯",price:40},{name:"豆乳三角骨",price:45}] };
+        const rawZhiZaoMenu = { "手作便當": [{name:"排骨便當",price:90},{name:"雞腿便當",price:100},{name:"宮保雞丁便當(辣)",price:110},{name:"獅子頭便當",price:110},{name:"魚魚便當",price:110},{name:"菜菜便當(無素食)",price:70}] };
+
+        const flattenMenuData = (menu, type, restaurant) => {
+            const list = [];
+            Object.entries(menu).forEach(([cat, items]) => {
+                items.forEach(i => list.push({ id: `${restaurant}_${i.name}`, type, restaurant, category: cat, name: i.name, price: i.price }));
+            });
+            return list;
+        };
+
+        const initialMenu = [
+            ...flattenMenuData(rawXiaoZhaWuMenu, '熱食', '小炸物'),
+            ...flattenMenuData(rawBaFangMenu, '熱食', '八方雲集'),
+            ...flattenMenuData(rawHuaChuanMenu, '熱食', '華饌'),
+            ...flattenMenuData(rawHanTingMenu, '熱食', '韓亭豆腐煲'),
+            ...flattenMenuData(rawWuLiangLiuMenu, '熱食', '五兩六牛燥飯'),
+            ...flattenMenuData(rawYiKouRuHunMenu, '熱食', '一口入餛'),
+            ...flattenMenuData(rawZhuoShangBinMenu, '熱食', '桌上賓'),
+            ...flattenMenuData(rawZhiZaoMenu, '熱食', '制灶手作便當'),
+            ...flattenMenuData(rawMacuMenu, '飲料', '麻古茶坊')
+        ];
+
+        // --- 3. 工具與輔助組件 ---
+        const normalizeDate = (val) => {
+            if (!val) return "";
+            try {
+                const d = new Date(val);
+                if (isNaN(d.getTime())) return String(val).trim().replace(/-/g, '/');
+                return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+            } catch (e) { return String(val); }
+        };
+        const getTodayStr = () => normalizeDate(new Date());
+
+        const copyToClipboard = (text, callback) => {
+            const input = document.createElement("textarea");
+            input.value = text;
+            document.body.appendChild(input);
+            input.select();
+            document.execCommand('copy');
+            document.body.removeChild(input);
+            if (callback) callback();
+        };
+
+        const Toast = ({ message, onClose }) => {
+            useEffect(() => { if (!message) return; const timer = setTimeout(onClose, 3000); return () => clearTimeout(timer); }, [message, onClose]);
+            if (!message) return null;
+            return ( <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] bg-slate-800 text-white px-6 py-3 rounded-full shadow-2xl font-bold animate-fade border border-white/20">{message}</div> );
+        };
+
+        // --- 4. 組件: MenuManagement (後台管理) ---
+        const MenuManagement = ({ menuList, showMsg, loadData }) => {
+            const [selectedRest, setSelectedRest] = useState("");
+            const [editingPrices, setEditingPrices] = useState({});
+            const [isSaving, setIsSaving] = useState(false);
+            const allRests = useMemo(() => [...new Set(menuList.map(item => item.restaurant))], [menuList]);
+            useEffect(() => { if (allRests.length > 0 && !selectedRest) setSelectedRest(allRests[0]); }, [allRests, selectedRest]);
+            const currentMenu = useMemo(() => {
+                const groups = {};
+                menuList.filter(i => i.restaurant === selectedRest).forEach(i => {
+                    if (!groups[i.category]) groups[i.category] = [];
+                    groups[i.category].push(i);
+                });
+                return groups;
+            }, [menuList, selectedRest]);
+
+            const handleUpdatePrice = async (item) => {
+                const newPrice = editingPrices[item.id] || item.price;
+                setIsSaving(true);
+                try {
+                    await fetch(SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'updateMenuItem', id: item.id, price: Number(newPrice), type: item.type, restaurant: item.restaurant, category: item.category, name: item.name }) });
+                    showMsg("✅ 價格修改成功");
+                    loadData();
+                } catch (e) { showMsg("❌ 更新失敗"); } finally { setIsSaving(false); }
+            };
+
+            const handleDeleteItem = async (item) => {
+                if (!confirm(`⚠️ 確定要永久刪除【${item.name}】嗎？`)) return;
+                try { await fetch(SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'deleteMenuItem', id: item.id }) }); showMsg("🗑️ 品項已移除"); loadData(); } catch (e) { showMsg("❌ 刪除失敗"); }
+            };
+
+            return (
+                <div className="space-y-8 animate-fade">
+                    <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 flex flex-col sm:flex-row items-center gap-6">
+                        <label className="font-black text-xl text-slate-800">選擇管理店家：</label>
+                        <select className="flex-1 sm:max-w-xs border-0 p-4 rounded-2xl bg-slate-50 font-black outline-none ring-2 ring-slate-100 focus:ring-indigo-400 shadow-inner" value={selectedRest} onChange={e => setSelectedRest(e.target.value)}>{allRests.map(r => <option key={r} value={r}>{r}</option>)}</select>
+                    </div>
+                    <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 space-y-12">
+                        {Object.entries(currentMenu).map(([cat, items]) => (
+                            <div key={cat}>
+                                <h3 className="font-black text-xl mb-6 flex items-center gap-3 text-slate-800 border-b pb-4"><span className="w-1.5 h-6 bg-indigo-500 rounded-full"></span>{cat}</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {items.map(item => (
+                                        <div key={item.id} className="p-6 rounded-2xl border border-slate-100 bg-slate-50/30 flex flex-col gap-4">
+                                            <div className="font-bold text-slate-700 text-lg">{item.name}</div>
+                                            <div className="flex gap-2 items-center">
+                                                <span className="text-sm font-bold text-slate-400">$</span>
+                                                <input type="number" className="w-24 p-2 text-sm border rounded-xl font-black outline-none focus:ring-2 focus:ring-indigo-400" placeholder={item.price} value={editingPrices[item.id] ?? item.price} onChange={e => setEditingPrices({...editingPrices, [item.id]: e.target.value})} />
+                                                <button onClick={() => handleUpdatePrice(item)} disabled={isSaving} className="bg-indigo-500 text-white px-4 py-2 rounded-xl font-bold hover:bg-indigo-600 transition-colors shadow-sm">儲存</button>
+                                                <button onClick={() => handleDeleteItem(item)} className="text-slate-300 hover:text-red-500 p-2 font-bold transition-colors">刪除</button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- 5. 組件: OrderSystem (前台點餐) ---
+        const OrderSystem = ({ menuList, orders, sharedRestaurant, phones, loadData, showMsg }) => {
+            const [selectedUser, setSelectedUser] = useState("");
+            const [cart, setCart] = useState({});
+            const [activeType, setActiveType] = useState("熱食");
+            const [activeRestaurant, setActiveRestaurant] = useState(sharedRestaurant || "");
+            
+            useEffect(() => { if (!sharedRestaurant && !activeRestaurant) { const rests = menuList.filter(item => item.type === activeType).map(item => item.restaurant); if (rests.length > 0) setActiveRestaurant(rests[0]); } }, [activeType, sharedRestaurant, menuList, activeRestaurant]);
+
+            const handleUpdateItem = (item, delta) => {
+                setCart(prev => {
+                    const next = { ...prev };
+                    const current = next[item.id] || { ...item, quantity: 0, ice: '正常冰', sugar: '正常', note: '' };
+                    current.quantity += delta;
+                    if (current.quantity <= 0) delete next[item.id]; else next[item.id] = current;
+                    return next;
+                });
+            };
+
+            const updateCartOptions = (key, field, value) => { setCart(prev => ({ ...prev, [key]: { ...prev[key], [field]: value } })); };
+            const cartTotal = useMemo(() => Object.values(cart).reduce((s, i) => s + (i.price * i.quantity), 0), [cart]);
+
+            const submitOrder = async () => {
+                if (!selectedUser) return showMsg("⚠️ 請選擇姓名！");
+                if (Object.keys(cart).length === 0) return showMsg("🛒 購物車是空的喔！");
+                const orderData = { action: 'create', id: Date.now().toString(), user: selectedUser, restaurant: activeRestaurant, items: cart, total: cartTotal, timestamp: new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }), date: getTodayStr() };
+                try { await fetch(SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(orderData) }); showMsg("✅ 訂單送出成功！"); setCart({}); setSelectedUser(""); loadData(); } catch (e) { showMsg("❌ 送出失敗。"); }
+            };
+
+            const todayShopOrders = useMemo(() => {
+                const today = getTodayStr();
+                return orders.filter(o => {
+                    const oDate = normalizeDate(o["日期"] || o.date);
+                    const oRest = o["餐廳"] || o.restaurant || Object.values(o).find(v => typeof v === 'string' && v === activeRestaurant);
+                    return oDate === today && oRest === activeRestaurant;
+                });
+            }, [orders, activeRestaurant]);
+
+            const groupedMenu = useMemo(() => {
+                const groups = {};
+                menuList.filter(i => i.restaurant === activeRestaurant && (sharedRestaurant ? true : i.type === activeType)).forEach(i => {
+                    if (!groups[i.category]) groups[i.category] = [];
+                    groups[i.category].push(i);
+                });
+                return groups;
+            }, [menuList, activeRestaurant, activeType, sharedRestaurant]);
+
+            const restaurantsOfType = useMemo(() => [...new Set(menuList.filter(i => i.type === activeType).map(i => i.restaurant))], [menuList, activeType]);
+
+            return (
+                <div className="flex flex-col lg:flex-row gap-8 animate-fade">
+                    <div className="flex-1 space-y-6">
+                        {sharedRestaurant ? (
+                            <div className="bg-gradient-to-br from-indigo-700 to-indigo-500 rounded-3xl p-8 text-white shadow-xl">
+                                <h2 className="text-3xl font-black mb-1 tracking-tight">🍽️ 本日揪團：{sharedRestaurant}</h2>
+                                <p className="opacity-90 font-bold"><span>📞 訂餐電話：{phones[sharedRestaurant] || "尚未設定"}</span></p>
+                            </div>
+                        ) : (
+                            <div className="flex gap-4">
+                                <button onClick={() => setActiveType("熱食")} className={`flex-1 py-4 rounded-2xl font-black text-lg border-2 transition-all ${activeType === "熱食" ? "bg-orange-500 text-white border-orange-500 shadow-lg scale-[1.02]" : "bg-white text-slate-400 border-slate-100"}`}>🔥 熱食區</button>
+                                <button onClick={() => setActiveType("飲料")} className={`flex-1 py-4 rounded-2xl font-black text-lg border-2 transition-all ${activeType === "飲料" ? "bg-cyan-500 text-white border-cyan-500 shadow-lg scale-[1.02]" : "bg-white text-slate-400 border-slate-100"}`}>🥤 飲料區</button>
+                            </div>
+                        )}
+                        <div className="bg-white p-7 rounded-3xl shadow-sm border border-slate-100">
+                            {!sharedRestaurant && (
+                                <div className="flex overflow-x-auto hide-scrollbar gap-2 mb-6 border-b pb-4">
+                                    {restaurantsOfType.map(rest => (
+                                        <button key={rest} onClick={() => setActiveRestaurant(rest)} className={`whitespace-nowrap px-6 py-2.5 rounded-full font-bold text-sm transition-all ${activeRestaurant === rest ? "bg-indigo-600 text-white shadow-md" : "bg-slate-50 text-slate-400"}`}>{rest}</button>
+                                    ))}
+                                </div>
+                            )}
+                            <div className="mb-8 flex flex-col sm:flex-row gap-4 items-start sm:items-center bg-slate-50 p-6 rounded-2xl">
+                                <label className="whitespace-nowrap text-slate-800 font-black text-xl">👤 點餐人：</label>
+                                <select className="w-full sm:w-64 border-0 p-3 rounded-xl bg-white font-black outline-none ring-2 ring-slate-100 focus:ring-indigo-400 shadow-sm" value={selectedUser} onChange={e => setSelectedUser(e.target.value)}><option value="">-- 請選擇名字 --</option>{employees.map(emp => <option key={emp} value={emp}>{emp}</option>)}</select>
+                            </div>
+                            <div className="space-y-12 max-h-[500px] overflow-y-auto pr-3 custom-scrollbar">
+                                {Object.entries(groupedMenu).map(([cat, items]) => (
+                                    <div key={cat}>
+                                        <h3 className="font-black text-xl mb-6 flex items-center gap-3 text-slate-800"><span className="w-1.5 h-6 bg-indigo-500 rounded-full"></span>{cat}</h3>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                            {items.map(item => {
+                                                const qty = cart[item.id]?.quantity || 0;
+                                                return (
+                                                    <div key={item.id} className={`flex justify-between items-center p-6 rounded-2xl border transition-all ${qty > 0 ? 'border-indigo-500 bg-indigo-50/20 shadow-md' : 'border-slate-100 bg-white hover:border-indigo-200'}`}>
+                                                        <div className="pr-3"><div className="font-black text-slate-800 text-lg">{item.name}</div><div className="text-indigo-600 font-bold mt-1">${item.price}</div></div>
+                                                        <div className="flex items-center gap-4 bg-white rounded-xl p-1.5 border shadow-sm">
+                                                            <button onClick={() => handleUpdateItem(item, -1)} className={`w-9 h-9 rounded-lg font-black text-xl flex items-center justify-center ${qty > 0 ? 'text-indigo-600' : 'text-slate-200'}`}>－</button>
+                                                            <span className="font-black w-5 text-center text-lg">{qty}</span>
+                                                            <button onClick={() => handleUpdateItem(item, 1)} className="w-9 h-9 rounded-lg font-black text-xl flex items-center justify-center text-indigo-600">＋</button>
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+                            <h3 className="font-black text-xl mb-6 text-indigo-800 flex items-center gap-2">📋 本日已下單明細 ({activeRestaurant})</h3>
+                            <div className="overflow-x-auto custom-scrollbar max-h-[400px]"><table className="w-full text-left text-sm"><thead><tr className="bg-slate-50 text-slate-500 font-black border-b"><th className="p-5">點餐人</th><th className="p-5">內容</th><th className="p-5 text-right">金額</th></tr></thead><tbody>{todayShopOrders.length === 0 ? <tr><td colSpan="3" className="text-center py-12 text-slate-400 font-bold uppercase">目前尚無點餐紀錄</td></tr> : todayShopOrders.map(o => { const items = Object.values(o["餐點明細(JSON)"] || o.items || {}); const total = items.reduce((s, i) => s + ((i.p || i.price || 0) * (i.q || i.quantity || 0)), 0); return (<tr key={o.id || o["訂單ID"]} className="border-b hover:bg-slate-50/50 transition-colors"><td className="p-5 font-black text-slate-800 whitespace-nowrap"><div className="bg-indigo-50 text-indigo-700 px-4 py-1.5 rounded-full text-center inline-block">{o["訂餐人"] || o.user}</div></td><td className="p-5">{items.map((i, idx) => (<div key={idx} className="text-sm text-slate-600 mb-2 font-bold">{i.name} {i.type==='飲料'&&<span className="text-indigo-400">({i.ice}/{i.sugar})</span>} {i.note && <span className="text-orange-500 ml-1">[{i.note}]</span>} <span className="text-indigo-600 ml-1 font-black">x{i.q || i.quantity}</span></div>))}</td><td className="p-5 text-right font-black text-red-500 text-lg">${total}</td></tr>) })}</tbody></table></div>
+                        </div>
+                    </div>
+
+                    <div className="w-full lg:w-96 space-y-6">
+                        <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-100 sticky top-4 animate-fade">
+                            <h2 className="text-xl font-black mb-7 flex items-center text-slate-800 border-b pb-5 gap-3"><span className="bg-indigo-100 p-2.5 rounded-xl text-indigo-600">🛒</span> 我的訂單內容</h2>
+                            {Object.keys(cart).length === 0 ? ( <div className="text-center py-20 text-slate-300"><div className="text-6xl mb-5">🧺</div><p className="font-bold text-lg">籃子空空的</p></div> ) : (
+                                <div className="space-y-6 mb-8 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
+                                    {Object.entries(cart).map(([k, d]) => (
+                                        <div key={k} className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100 flex flex-col gap-3 animate-fade">
+                                            <div className="flex justify-between items-start"><div className="font-black text-slate-800 leading-snug flex-1 pr-2">{d.name}</div><div className="text-right"><div className="font-black text-slate-800 text-lg">${d.price * d.quantity}</div><div className="text-xs text-indigo-500 font-black">x{d.quantity}</div></div></div>
+                                            {d.type === '飲料' ? ( <div className="flex gap-2"><select className="flex-1 text-xs border rounded-lg p-2 bg-white font-bold outline-none" value={d.ice} onChange={e => updateCartOptions(k, 'ice', e.target.value)}>{ICE_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select><select className="flex-1 text-xs border rounded-lg p-2 bg-white font-bold outline-none" value={d.sugar} onChange={e => updateCartOptions(k, 'sugar', e.target.value)}>{SUGAR_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}</select></div> ) : ( <input type="text" className="w-full text-xs border rounded-lg p-2 bg-white font-bold outline-none ring-1 ring-slate-200 focus:ring-orange-300 shadow-inner" placeholder="✎ 備註 (如：不辣)" value={d.note || ""} onChange={e => updateCartOptions(k, 'note', e.target.value)} /> )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            <div className="border-t border-slate-100 pt-7">
+                                <div className="flex justify-between items-center mb-10"><span className="font-bold text-slate-500 text-lg">應付合計</span><span className="text-5xl font-black text-indigo-600 tracking-tighter">${cartTotal}</span></div>
+                                <button onClick={submitOrder} disabled={Object.keys(cart).length === 0} className={`w-full py-6 rounded-2xl font-black tracking-[0.3em] text-xl shadow-lg transition-all active:scale-95 ${Object.keys(cart).length === 0 ? "bg-slate-100 text-slate-300 shadow-none cursor-not-allowed" : "bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-100"}`}>確認送出</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- 6. 組件: DailyDashboard (管理區) ---
+        const DailyDashboard = ({ menuList, orders, phones, setPhones, loadData, showMsg }) => {
+            const [selectedRest, setSelectedRest] = useState("");
+            const [phoneInput, setPhoneInput] = useState("");
+            const [isSaving, setIsSaving] = useState(false);
+            const [paidMap, setPaidMap] = useState({});
+
+            const allRests = useMemo(() => [...new Set(menuList.map(item => item.restaurant))], [menuList]);
+            useEffect(() => { if (allRests.length > 0 && !selectedRest) setSelectedRest(allRests[0]); }, [allRests, selectedRest]);
+            useEffect(() => { setPhoneInput(phones[selectedRest] || ""); }, [selectedRest, phones]);
+            useEffect(() => { const map = {}; orders.forEach(o => { map[o["訂單ID"] || o.id] = (o["繳費狀態"] === "已繳"); }); setPaidMap(map); }, [orders]);
+
+            const filteredOrders = useMemo(() => {
+                const today = getTodayStr();
+                return orders.filter(o => {
+                    const oDate = normalizeDate(o["日期"] || o.date);
+                    const oRest = o["餐廳"] || o.restaurant || Object.values(o).find(v => typeof v === 'string' && v === selectedRest);
+                    return oDate === today && oRest === selectedRest;
+                });
+            }, [orders, selectedRest]);
+
+            const stats = useMemo(() => {
+                const res = { t: 0, items: {} };
+                filteredOrders.forEach(o => {
+                    const items = Object.values(o["餐點明細(JSON)"] || o.items || {});
+                    items.forEach(i => {
+                        const n = i.type === '飲料' ? `${i.name} (${i.ice}/${i.sugar})` : i.name;
+                        const key = i.note ? `${n} [${i.note}]` : n;
+                        if (!res.items[key]) res.items[key] = { q: 0, p: i.p || i.price || 0 };
+                        res.items[key].q += (i.q || i.quantity || 0); 
+                        res.t += ((i.p || i.price || 0) * (i.q || i.quantity || 0));
+                    });
+                });
+                return res;
+            }, [filteredOrders]);
+
+            const updatePaidStatus = async (id) => {
+                const newStatus = !paidMap[id];
+                setPaidMap(p => ({ ...p, [id]: newStatus }));
+                try {
+                    await fetch(SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'updatePaid', id, paid: newStatus }) });
+                    showMsg("✅ 繳費狀態已同步");
+                } catch (e) { showMsg("❌ 同步失敗"); }
+            };
+
+            const handleDeleteOrder = async (id) => {
+                if (!confirm("⚠️ 確定要刪除這筆訂單嗎？")) return;
+                try { await fetch(SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'delete', id }) }); showMsg("🗑️ 訂單已移除"); loadData(); } catch (e) { showMsg("❌ 刪除失敗"); }
+            };
+
+            const copyToExcel = () => {
+                if (filteredOrders.length === 0) return showMsg("⚠️ 無資料可複製");
+                let tsv = "訂餐人\t內容明細\t金額\t繳費狀態\n";
+                filteredOrders.forEach(o => {
+                    const items = Object.values(o["餐點明細(JSON)"] || o.items || {}).map(i => `${i.name} x${i.q || i.quantity}`).join(", ");
+                    const total = Object.values(o["餐點明細(JSON)"] || o.items || {}).reduce((s, i) => s + ((i.p || i.price || 0) * (i.q || i.quantity || 0)), 0);
+                    tsv += `${o["訂餐人"] || o.user}\t${items}\t${total}\t${paidMap[o["訂單ID"] || o.id] ? "已繳" : "未繳"}\n`;
+                });
+                copyToClipboard(tsv, () => showMsg("📊 已複製到剪貼簿"));
+            };
+
+            return (
+                <div className="space-y-8 animate-fade">
+                    <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 flex flex-col md:flex-row gap-10 items-end">
+                        <div className="flex-1 space-y-6 w-full">
+                            <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2">📢 揪團總管中心 ({getTodayStr()})</h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div><label className="block text-sm font-black text-slate-500 mb-3 uppercase tracking-widest">1. 指定今日餐廳</label><select className="w-full border-0 p-4 rounded-2xl bg-slate-50 font-black outline-none ring-2 ring-slate-100 shadow-inner" value={selectedRest} onChange={e => setSelectedRest(e.target.value)}>{allRests.map(r => <option key={r} value={r}>{r}</option>)}</select></div>
+                                <div><label className="block text-sm font-black text-slate-500 mb-3 uppercase tracking-widest">2. 店家電話管理</label><div className="flex gap-2"><input type="text" value={phoneInput} onChange={e => setPhoneInput(e.target.value)} className="w-full border-0 p-4 rounded-2xl bg-slate-50 font-black outline-none ring-2 ring-slate-100 focus:ring-indigo-400 shadow-inner" placeholder="例: 07-123456" /><button onClick={async () => { setIsSaving(true); try { await fetch(SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'savePhone', restaurant: selectedRest, phone: phoneInput }) }); setPhones(p=>({...p, [selectedRest]: phoneInput})); showMsg("✅ 電話已更新"); } catch (e) { showMsg("❌ 失敗"); } finally { setIsSaving(false); } }} disabled={isSaving} className="bg-slate-800 text-white px-8 py-4 rounded-2xl font-black hover:bg-black active:scale-95 shadow-lg">儲存</button></div></div>
+                            </div>
+                        </div>
+                        <div className="flex flex-col gap-4 w-full md:w-auto"><button onClick={copyToExcel} className="bg-emerald-600 text-white font-black py-4 px-12 rounded-2xl shadow-xl active:scale-95 transition-all text-lg">📊 複製 Excel 表格</button><button onClick={() => copyToClipboard(window.location.origin + window.location.pathname + '?r=' + encodeURIComponent(selectedRest), () => showMsg("🔗 網址已複製"))} className="bg-indigo-600 text-white font-black py-4 px-12 rounded-2xl shadow-xl active:scale-95 transition-all text-lg flex items-center justify-center gap-2">🔗 複製分享連結</button></div>
+                    </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                        <div className="lg:col-span-2 bg-white p-8 rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+                            <h3 className="font-black text-xl mb-8 border-b pb-5 text-indigo-600 flex justify-between items-center"><span>💰 同事收款名冊 ({selectedRest})</span><span className="text-xs text-slate-400 font-normal">勾選繳費自動同步</span></h3>
+                            <div className="overflow-x-auto max-h-[600px] custom-scrollbar"><table className="w-full text-left text-sm"><thead><tr className="bg-slate-50 text-slate-500 font-black border-b uppercase tracking-wider"><th className="p-5 text-center">繳費</th><th className="p-5 text-center">姓名</th><th className="p-5">內容明細</th><th className="p-5 text-right">金額 / 管理</th></tr></thead><tbody>{filteredOrders.length === 0 ? <tr><td colSpan="4" className="text-center py-24 text-slate-400 font-bold text-lg uppercase">今日無紀錄</td></tr> : filteredOrders.map(order => { const items = Object.values(order["餐點明細(JSON)"] || order.items || {}); const subtotal = items.reduce((s, i) => s + ((i.p || i.price || 0) * (i.q || i.quantity || 0)), 0); const oid = order["訂單ID"] || order.id; const isPaid = !!paidMap[oid]; return (<tr key={oid} className={`border-b transition-all ${isPaid ? 'bg-emerald-50/30' : 'hover:bg-slate-50/50'}`}><td className="p-5 text-center"><input type="checkbox" className="w-6 h-6 rounded-md border-slate-300 text-indigo-600" checked={isPaid} onChange={() => updatePaidStatus(oid)} /></td><td className="p-5 font-black text-slate-800 whitespace-nowrap text-center"><div className={`px-5 py-2 rounded-full inline-block min-w-[100px] shadow-sm ${isPaid ? 'bg-white text-emerald-600' : 'bg-indigo-50 text-indigo-700'}`}>{order["訂餐人"] || order.user}</div></td><td className="p-5">{items.map((i, idx) => (<div key={idx} className="text-sm text-slate-600 mb-2 font-bold">{i.name} {i.type==='飲料'&&<span className="text-indigo-400">({i.ice}/{i.sugar})</span>} {i.note && <span className="text-orange-500 ml-1">[{i.note}]</span>} <span className="text-indigo-600 ml-1 font-black">x{i.quantity || i.q}</span></div>))}</td><td className="p-5 text-right font-black whitespace-nowrap"><div className="flex flex-col items-end gap-2"><span className={`text-xl ${isPaid ? 'text-slate-400 line-through' : 'text-red-500'}`}>${subtotal}</span><button onClick={() => handleDeleteOrder(oid)} className="text-[11px] text-slate-300 hover:text-red-600 font-black uppercase tracking-widest transition-colors">刪除</button></div></td></tr>) })}</tbody></table></div>
+                        </div>
+                        <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+                            <h3 className="font-black text-xl mb-8 border-b pb-5 text-indigo-600"><span>☎️</span> 叫餐統計表</h3>
+                            {Object.keys(stats.items).length === 0 ? <div className="py-24 text-center text-slate-300 font-bold tracking-widest text-lg">尚無訂單</div> : ( <div className="space-y-5">{Object.entries(stats.items).map(([n, d]) => ( <div key={n} className="flex justify-between border-b border-slate-50 pb-4 items-start animate-fade group"><span className="font-bold text-base text-slate-700 group-hover:text-indigo-600 transition-colors">{n}</span><span className="text-indigo-600 font-black bg-indigo-50 px-4 py-1.5 rounded-xl text-lg shadow-sm">x{d.q}</span></div> ))}<div className="flex justify-between items-center pt-10 font-black text-3xl text-red-500 tracking-tighter"><span>總計</span><span>${stats.t}</span></div></div> )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- 7. 主程式: App ---
+        const App = () => {
+            const [tab, setTab] = useState("dashboard");
+            const [menu, setMenu] = useState(initialMenu); 
+            const [orders, setOrders] = useState([]);
+            const [phones, setPhones] = useState({});
+            const [sim, setSim] = useState("");
+            const [loading, setLoading] = useState(false);
+            const [msg, setMsg] = useState("");
+            const shared = sim || new URLSearchParams(window.location.search).get('r');
+
+            const loadData = useCallback(async () => {
+                if (!SCRIPT_URL) return;
+                setLoading(true);
+                try {
+                    const [oRes, mRes, pRes] = await Promise.allSettled([ 
+                        fetch(`${SCRIPT_URL}?action=getOrders`).then(r => r.json()), 
+                        fetch(`${SCRIPT_URL}?action=getMenu`).then(r => r.json()), 
+                        fetch(`${SCRIPT_URL}?action=getPhones`).then(r => r.json()) 
+                    ]);
+                    if (oRes.status === 'fulfilled' && oRes.value.status === 'success') setOrders(oRes.value.data || []);
+                    if (mRes.status === 'fulfilled' && mRes.value.status === 'success' && mRes.value.data?.length > 0) {
+                        setMenu(mRes.value.data.map(i => ({ id: i.ID, type: i.大類, restaurant: i.餐廳, category: i.分類, name: i.品項, price: Number(i.價格) })));
+                    }
+                    if (pRes.status === 'fulfilled' && pRes.value.status === 'success') { 
+                        const map = {}; pRes.value.data.forEach(x => map[x.餐廳名稱] = x.電話號碼); setPhones(map); 
+                    }
+                } catch (e) { console.error("Error loading data:", e); } 
+                finally { setLoading(false); }
+            }, []);
+
+            useEffect(() => { loadData(); }, [loadData]);
+
+            if (shared) {
+                return (
+                    <div className="min-h-screen p-6">
+                        <Toast message={msg} onClose={() => setMsg("")} />
+                        <OrderSystem menuList={menu} orders={orders} sharedRestaurant={shared} phones={phones} loadData={loadData} showMsg={setMsg} />
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen flex flex-col pb-10">
+                    <Toast message={msg} onClose={() => setMsg("")} />
+                    <header className="bg-white/90 backdrop-blur-md shadow-sm sticky top-0 z-30 border-b border-slate-100 h-20">
+                        <div className="max-w-7xl mx-auto px-6 h-full flex items-center justify-between">
+                            <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-indigo-400 tracking-tight flex items-center gap-2 uppercase">🍱 點餐管理中心</h1>
+                            <div className="flex gap-3 bg-slate-100/50 p-1.5 rounded-2xl border border-slate-200/50 overflow-x-auto hide-scrollbar">
+                                <button onClick={() => setTab("dashboard")} className={`whitespace-nowrap px-7 py-2.5 rounded-xl text-sm font-black transition-all ${tab === "dashboard" ? "bg-white text-indigo-600 shadow-sm border border-slate-200" : "text-slate-400 hover:text-slate-600"}`}>📊 今日總管</button>
+                                <button onClick={() => setTab("menu_mgmt")} className={`whitespace-nowrap px-7 py-2.5 rounded-xl text-sm font-black transition-all ${tab === "menu_mgmt" ? "bg-white text-indigo-600 shadow-sm border border-slate-200" : "text-slate-400 hover:text-slate-600"}`}>⚙️ 菜單管理</button>
+                            </div>
+                        </div>
+                    </header>
+                    <main className="flex-1 max-w-7xl mx-auto w-full p-6 py-10">
+                        {loading && <div className="fixed top-24 right-8 bg-indigo-600 text-white px-6 py-3 rounded-2xl shadow-2xl z-50 text-xs font-black animate-pulse uppercase tracking-widest">🔄 資料同步中...</div>}
+                        {tab === "dashboard" && <DailyDashboard menuList={menu} orders={orders} phones={phones} setPhones={setPhones} loadData={loadData} showMsg={setMsg} setOrders={setOrders} />}
+                        {tab === "menu_mgmt" && <MenuManagement menuList={menu} showMsg={setMsg} loadData={loadData} />}
+                    </main>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
